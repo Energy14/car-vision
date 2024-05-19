@@ -3,9 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <title>Car Detection Stream</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
+
+    <script type="text/javascript">
+const socket = io();
+
+socket.on('number', function(msg) {
+    var camera_image = document.getElementById("thecam");
+
+    const hexString = msg.data;
+    var byteArray = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+    document.getElementById('updCount').innerText = byteArray[0];
+
+    byteArray = byteArray.slice(1);
+    const blob = new Blob([byteArray], { type: 'image/png' });
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        camera_image.src = event.target.result;
+    };
+    reader.readAsDataURL(blob);
+
+});
+
+    </script>
 </head>
 <body>
     <h1>Car Detection Live Stream</h1>
-    <img src="{{ url_for('video_feed') }}" alt="Live stream">
+    <img id="thecam" src="" alt="Live stream">
+    <p>Car count:<span id="updCount">3</span></p>
 </body>
 </html>

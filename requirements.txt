@@ -1,0 +1,5 @@
+#opencv
+#cuda
+jupyter
+flask
+flask-socketio
