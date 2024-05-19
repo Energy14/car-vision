@@ -13,7 +13,7 @@ layer_names = net.getLayerNames()
 output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers().flatten()]
 
 def gen_frames():  
-    cap = cv2.VideoCapture(1)  # Use the default camera
+    cap = cv2.VideoCapture(1) # set the camera, 0 for default
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -43,10 +43,10 @@ def gen_frames():
 
         indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
         if len(indexes) > 0 and isinstance(indexes, tuple):
-            indexes = indexes[0]  # This might be necessary depending on OpenCV version
+            indexes = indexes[0]
 
         for i in indexes:
-            i = i[0] if isinstance(i, tuple) else i  # Ensure 'i' is an integer index
+            i = i[0] if isinstance(i, tuple) else i
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             if label == "car":
