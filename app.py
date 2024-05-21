@@ -5,12 +5,13 @@ import numpy as np
 from flask_socketio import SocketIO, emit
 from threading import Thread, Event
 import time
+#import math
 
 DEBUG_SHOW_SPOT=True#False #True #False #True
 # 0 == cam 2 (capture device #1)
 # 1 == localhost stream port 2727
 # 2 == remote server port 2727
-CAM2_MODE = 2
+CAM2_MODE = 1
 app = Flask(__name__)
 socketio = SocketIO(app)
 DIFFK = 20
@@ -40,21 +41,15 @@ def applis(x, y):
 def applis_l(x, y):
     return aplis_predicate(x, y) ==1
 
-def they_are_the_same_picture(im1, im2):
+def they_are_the_same_picture(im1a, im2a):
+    im1 = im1a[0]
+    im2 = im2a[0]
     #t = [ 1 if i-j < DIFFK else 0 for i in j for j in im1]
     pxs = len(im1)*len(im1[0])
-    print("~~~~~~~~~~~~~~~~~~~~~~They are the same picture!")
-    lpxs = 0
-    for r in im1:
-        for k in r:
-            print(im1[r,k])
-            if(math.abs(im1[r,k][0]-im2[r,k][1]) < DIFFK \
-               and math.abs(im1[r,k][1]-im2[r,k][1]) < DIFFK \
-               and math.abs(im1[r,k][2]-im2[r,k][2]) < DIFFK \
-                ):
-                lpxs =lpxs +1
-    if(1.0*pxs/lpxs > 95):
-        return True
+    lpxs =  np.sum(np.all(np.abs(im1 - im2) < DIFFK, axis=-1))
+    if(1.0*lpxs/pxs > 0.95):
+        return True 
+        print("~~~~~~~~~~~~~~~~~~~~~~They are the same picture!")
     else:
         return False
 
@@ -135,7 +130,9 @@ def gen_frames():
             label = str(classes[class_ids[i]])
             if label == "car":
                 if(len(pb)>0):
-                    print(they_are_the_same_picture(frame, pb[0]))
+                    for j in pb:
+                        if(they_are_the_same_picture(frame, j)):
+                            print("FFOumnd")
                 pb.append(frame)
                 count = count+1
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
