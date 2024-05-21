@@ -6,13 +6,14 @@ from flask_socketio import SocketIO, emit
 from threading import Thread, Event
 import time
 
-DEBUG_SHOW_SPOT=False #True #False #True
+DEBUG_SHOW_SPOT=True#False #True #False #True
 # 0 == cam 2 (capture device #1)
 # 1 == localhost stream port 2727
-CAM2_MODE = 0
+# 2 == remote server port 2727
+CAM2_MODE = 2
 app = Flask(__name__)
 socketio = SocketIO(app)
-
+DIFFK = 20
 
 # Load YOLO
 net = cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")
@@ -27,6 +28,9 @@ count =0
 countdi={"c": 0, "i": None}
 yyy=410
 
+pb = []
+pb2 = []
+
 def aplis_predicate(x, y):
     return (x-500)**2/420.5**2+(y-yyy)**2/122.5**2
 
@@ -36,9 +40,26 @@ def applis(x, y):
 def applis_l(x, y):
     return aplis_predicate(x, y) ==1
 
+def they_are_the_same_picture(im1, im2):
+    #t = [ 1 if i-j < DIFFK else 0 for i in j for j in im1]
+    pxs = len(im1)*len(im1[0])
+    print("~~~~~~~~~~~~~~~~~~~~~~They are the same picture!")
+    lpxs = 0
+    for r in im1:
+        for k in r:
+            print(im1[r,k])
+            if(math.abs(im1[r,k][0]-im2[r,k][1]) < DIFFK \
+               and math.abs(im1[r,k][1]-im2[r,k][1]) < DIFFK \
+               and math.abs(im1[r,k][2]-im2[r,k][2]) < DIFFK \
+                ):
+                lpxs =lpxs +1
+    if(1.0*pxs/lpxs > 95):
+        return True
+    else:
+        return False
 
 def ieks_rinka(xx, xy, xw, xh):
-    horp = 400
+    horp = 420
     verp = 500
     if(xy <horp): #_|
         if(xx+xw < verp): #<-
@@ -56,15 +77,28 @@ def ieks_rinka(xx, xy, xw, xh):
             y=xy+xh
     return applis(x, y)
 
-def gen_frames():  
-    global count, countdi
-    print("framed")
+theframe = None
+
+def skipjump_fame():
+    global theframe, thread_stop_event
     cap = cv2.VideoCapture(1) if CAM2_MODE == 0 else \
-    cv2.VideoCapture("http://localhost:2727/") # set the camera, 0 for default
-    while  not thread_stop_event2.isSet():
-        ret, frame = cap.read()
+    cv2.VideoCapture("http://localhost:2727/") if CAM2_MODE ==1 else \
+    cv2.VideoCapture("http://jtag.me:2727/")# set the camera, 0 for default
+    while   not thread_stop_event.isSet():
+        ret, theframe = cap.read()
         if not ret:
-            break
+            print("caps failed")
+            theframe = None
+            time.sleep(1)
+        
+def gen_frames():  
+    global count, countdi, pb, theframe
+    print("framed")
+    while  not thread_stop_event2.isSet():
+        if theframe is None:
+            time.sleep(1)
+            continue
+        frame = theframe.copy()
         
         height, width, _ = frame.shape
         blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
@@ -100,6 +134,9 @@ def gen_frames():
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             if label == "car":
+                if(len(pb)>0):
+                    print(they_are_the_same_picture(frame, pb[0]))
+                pb.append(frame)
                 count = count+1
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 cv2.putText(frame, label, (x, y + 30), cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 2)
@@ -123,17 +160,23 @@ def gen_frames():
         ret, buffer = cv2.imencode('.png', frame)
         socketio.emit('number', {'data': (bytearray([count]) + buffer.tobytes()).hex()})
 
+
+thread2 = Thread(target=gen_frames)
+thread = Thread(target=skipjump_fame)
+thread_stop_event2 = Event()
+thread_stop_event = Event()
+
+
 @app.route('/')
 def index():
     global thread2
     if not thread2.is_alive():
         thread2 = Thread(target=gen_frames)
         thread2.start()
+        thread = Thread(target=skipjump_fame)
+        thread.start()
     return render_template('index.html')
 
-
-thread2 = Thread(target=gen_frames)
-thread_stop_event2 = Event()
 
 @socketio.on('connect')
 def handle_connect():
@@ -141,7 +184,10 @@ def handle_connect():
     if not thread2.is_alive():
         thread2 = Thread(target=gen_frames)
         thread2.start()
+        thread = Thread(target=skipjump_fame)
+        thread.start()
 
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)
     #thread_stop_event2.set()
+
