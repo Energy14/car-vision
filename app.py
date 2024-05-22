@@ -5,14 +5,17 @@ import numpy as np
 from flask_socketio import SocketIO, emit
 from threading import Thread, Event
 import time
+#import math
 
-DEBUG_SHOW_SPOT=True #True #False #True
+DEBUG_SHOW_SPOT=True#True#False #True #False #True
 # 0 == cam 2 (capture device #1)
 # 1 == localhost stream port 2727
-CAM2_MODE = 0
+# 2 == remote server port 2727
+CAM2_MODE = 2
 app = Flask(__name__)
 socketio = SocketIO(app)
-
+DIFFK = 20
+TRESHOLD_CORR = 0.70
 
 # Load YOLO
 net = cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")
@@ -27,6 +30,10 @@ count =0
 countdi={"c": 0, "i": None}
 yyy=410
 
+pb1 = []
+pb2 = []
+pb=[]
+
 def aplis_predicate(x, y):
     return (x-500)**2/420.5**2+(y-yyy)**2/122.5**2
 
@@ -36,9 +43,26 @@ def applis(x, y):
 def applis_l(x, y):
     return aplis_predicate(x, y) ==1
 
+def they_are_the_same_picture(im1a, im2a):
+    #t = [ 1 if i-j < DIFFK else 0 for i in j for j in im1]
+    hl = []
+    for i in [im1a, im2a]:
+        hist = cv2.calcHist([i], [0, 1, 2], None, 
+                        [256//DIFFK, 256//DIFFK, 256//DIFFK], 
+                        [0, 256, 0, 256, 0, 256])
+        #print(hist)
+        hl.append(cv2.normalize(hist, hist).flatten())
+
+    simil = cv2.compareHist(hl[0], hl[1], cv2.HISTCMP_CORREL    )
+
+    if(simil>TRESHOLD_CORR): #<2/100):
+        return True 
+        #print("~~~~~~~~~~~~~~~~~~~~~~They are the same picture!")
+    else:
+        return False
 
 def ieks_rinka(xx, xy, xw, xh):
-    horp = 400
+    horp = 420
     verp = 500
     if(xy <horp): #_|
         if(xx+xw < verp): #<-
@@ -56,15 +80,29 @@ def ieks_rinka(xx, xy, xw, xh):
             y=xy+xh
     return applis(x, y)
 
-def gen_frames():  
-    global count, countdi
-    print("framed")
+theframe = None
+
+def skipjump_fame():
+    global theframe, thread_stop_event
     cap = cv2.VideoCapture(1) if CAM2_MODE == 0 else \
-    cv2.VideoCapture("http://jtag.me:2727/") # set the camera, 0 for default
-    while  not thread_stop_event2.isSet():
-        ret, frame = cap.read()
+    cv2.VideoCapture("http://localhost:2727/") if CAM2_MODE ==1 else \
+    cv2.VideoCapture("http://jtag.me:2727/")# set the camera, 0 for default
+    while   not thread_stop_event.isSet():
+        ret, theframe = cap.read()
         if not ret:
-            break
+            print("caps failed")
+            theframe = None
+            time.sleep(1)
+
+totalcars = 0        
+def gen_frames():  
+    global count, countdi, pb, pb1, pb2, theframe, totalcars
+    print("framed")
+    while  not thread_stop_event2.isSet():
+        if theframe is None:
+            time.sleep(1)
+            continue
+        frame = theframe.copy()
         
         height, width, _ = frame.shape
         blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
@@ -95,15 +133,36 @@ def gen_frames():
         if len(indexes) > 0 and isinstance(indexes, tuple):
             indexes = indexes[0]
         count =0
+        newcars = 0
         for i in indexes:
             i = i[0] if isinstance(i, tuple) else i
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             if label == "car":
+                thiscar = frame[y:y + h, x:x + w].copy()
+                if(True): #len(pb)>0):
+                    def is_in_pb1(im):
+                        for j in pb1:
+                            if(they_are_the_same_picture(thiscar, j)):
+                                return True
+                        return False
+                    def is_in_pb2(im):
+                        for j in pb2:
+                            if(they_are_the_same_picture(thiscar, j)):
+                                return True
+                        return False
+                    if(is_in_pb1(thiscar) or is_in_pb2(thiscar)):
+                        ...
+                    else:
+                        newcars=newcars+1
+                        totalcars = totalcars+1
+                pb.append(thiscar)
                 count = count+1
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 cv2.putText(frame, label, (x, y + 30), cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 2)
-                
+        if len(pb1)>0:
+            pb2 = pb1
+        pb1 = pb
         if(DEBUG_SHOW_SPOT):
             alpha = 0.75
             color=(125, 25, 125)
@@ -121,7 +180,14 @@ def gen_frames():
 
 
         ret, buffer = cv2.imencode('.png', frame)
-        socketio.emit('number', {'data': (bytearray([count]) + buffer.tobytes()).hex()})
+        socketio.emit('number', {'data': (bytearray([count]) +bytearray([newcars]) +bytearray([totalcars]) +  buffer.tobytes()).hex()})
+
+
+thread2 = Thread(target=gen_frames)
+thread = Thread(target=skipjump_fame)
+thread_stop_event2 = Event()
+thread_stop_event = Event()
+
 
 @app.route('/')
 def index():
@@ -129,11 +195,10 @@ def index():
     if not thread2.is_alive():
         thread2 = Thread(target=gen_frames)
         thread2.start()
+        thread = Thread(target=skipjump_fame)
+        thread.start()
     return render_template('index.html')
 
-
-thread2 = Thread(target=gen_frames)
-thread_stop_event2 = Event()
 
 @socketio.on('connect')
 def handle_connect():
@@ -141,7 +206,10 @@ def handle_connect():
     if not thread2.is_alive():
         thread2 = Thread(target=gen_frames)
         thread2.start()
+        thread = Thread(target=skipjump_fame)
+        thread.start()
 
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)
     #thread_stop_event2.set()
+

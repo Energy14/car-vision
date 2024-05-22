@@ -38,13 +38,21 @@
 
         p {
             font-size: 18px;
+            margin: 10px 0;
             color: #16a085;
         }
 
-        #updCount {
+        span {
             font-weight: bold;
             font-size: 22px;
             color: #e74c3c;
+        }
+
+        .stat {
+            background-color: #ecf0f1;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
         }
     </style>
     <script type="text/javascript">
@@ -56,8 +64,10 @@
             const hexString = msg.data;
             var byteArray = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
             document.getElementById('updCount').innerText = byteArray[0];
+            document.getElementById('diffCount').innerText = byteArray[1];
+            document.getElementById('totCount').innerText = byteArray[2];
         
-            byteArray = byteArray.slice(1);
+            byteArray = byteArray.slice(3);
             const blob = new Blob([byteArray], { type: 'image/png' });
         
             const reader = new FileReader();
@@ -73,7 +83,15 @@
     <div class="container">
         <h1>Car Detection Live Stream</h1>
         <img id="thecam" src="" alt="Live stream">
-        <p>Car count: <span id="updCount">3</span></p>
+        <div class="stat">
+            <p>Car count: <span id="updCount">0</span></p>
+        </div>
+        <div class="stat">
+            <p>Difference: <span id="diffCount">0</span></p>
+        </div>
+        <div class="stat">
+            <p>Total cars: <span id="totCount">0</span></p>
+        </div>
     </div>
 </body>
 </html>
