@@ -4,33 +4,76 @@
     <meta charset="UTF-8">
     <title>Car Detection Stream</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
 
+        .container {
+            text-align: center;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            width: 50%;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        p {
+            font-size: 18px;
+            color: #16a085;
+        }
+
+        #updCount {
+            font-weight: bold;
+            font-size: 22px;
+            color: #e74c3c;
+        }
+    </style>
     <script type="text/javascript">
-const socket = io();
-
-socket.on('number', function(msg) {
-    var camera_image = document.getElementById("thecam");
-
-    const hexString = msg.data;
-    var byteArray = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-    document.getElementById('updCount').innerText = byteArray[0];
-
-    byteArray = byteArray.slice(1);
-    const blob = new Blob([byteArray], { type: 'image/png' });
-
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        camera_image.src = event.target.result;
-    };
-    reader.readAsDataURL(blob);
-
-});
-
+        const socket = io();
+        
+        socket.on('number', function(msg) {
+            var camera_image = document.getElementById("thecam");
+        
+            const hexString = msg.data;
+            var byteArray = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            document.getElementById('updCount').innerText = byteArray[0];
+        
+            byteArray = byteArray.slice(1);
+            const blob = new Blob([byteArray], { type: 'image/png' });
+        
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                camera_image.src = event.target.result;
+            };
+            reader.readAsDataURL(blob);
+        
+        });
     </script>
 </head>
 <body>
-    <h1>Car Detection Live Stream</h1>
-    <img id="thecam" src="" alt="Live stream">
-    <p>Car count:<span id="updCount">3</span></p>
+    <div class="container">
+        <h1>Car Detection Live Stream</h1>
+        <img id="thecam" src="" alt="Live stream">
+        <p>Car count: <span id="updCount">3</span></p>
+    </div>
 </body>
 </html>

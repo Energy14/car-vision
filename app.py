@@ -6,7 +6,7 @@ from flask_socketio import SocketIO, emit
 from threading import Thread, Event
 import time
 
-DEBUG_SHOW_SPOT=False #True #False #True
+DEBUG_SHOW_SPOT=True #True #False #True
 # 0 == cam 2 (capture device #1)
 # 1 == localhost stream port 2727
 CAM2_MODE = 0
@@ -60,7 +60,7 @@ def gen_frames():
     global count, countdi
     print("framed")
     cap = cv2.VideoCapture(1) if CAM2_MODE == 0 else \
-    cv2.VideoCapture("http://localhost:2727/") # set the camera, 0 for default
+    cv2.VideoCapture("http://jtag.me:2727/") # set the camera, 0 for default
     while  not thread_stop_event2.isSet():
         ret, frame = cap.read()
         if not ret:
