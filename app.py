@@ -7,14 +7,15 @@ from threading import Thread, Event
 import time
 #import math
 
-DEBUG_SHOW_SPOT=True#False #True #False #True
+DEBUG_SHOW_SPOT=False#True#False #True #False #True
 # 0 == cam 2 (capture device #1)
 # 1 == localhost stream port 2727
 # 2 == remote server port 2727
-CAM2_MODE = 1
+CAM2_MODE = 0
 app = Flask(__name__)
 socketio = SocketIO(app)
 DIFFK = 20
+TRESHOLD_CORR = 0.70
 
 # Load YOLO
 net = cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")
@@ -29,8 +30,9 @@ count =0
 countdi={"c": 0, "i": None}
 yyy=410
 
-pb = []
+pb1 = []
 pb2 = []
+pb=[]
 
 def aplis_predicate(x, y):
     return (x-500)**2/420.5**2+(y-yyy)**2/122.5**2
@@ -42,14 +44,20 @@ def applis_l(x, y):
     return aplis_predicate(x, y) ==1
 
 def they_are_the_same_picture(im1a, im2a):
-    im1 = im1a[0]
-    im2 = im2a[0]
     #t = [ 1 if i-j < DIFFK else 0 for i in j for j in im1]
-    pxs = len(im1)*len(im1[0])
-    lpxs =  np.sum(np.all(np.abs(im1 - im2) < DIFFK, axis=-1))
-    if(1.0*lpxs/pxs > 0.95):
+    hl = []
+    for i in [im1a, im2a]:
+        hist = cv2.calcHist([i], [0, 1, 2], None, 
+                        [256//DIFFK, 256//DIFFK, 256//DIFFK], 
+                        [0, 256, 0, 256, 0, 256])
+        #print(hist)
+        hl.append(cv2.normalize(hist, hist).flatten())
+
+    simil = cv2.compareHist(hl[0], hl[1], cv2.HISTCMP_CORREL    )
+
+    if(simil>TRESHOLD_CORR): #<2/100):
         return True 
-        print("~~~~~~~~~~~~~~~~~~~~~~They are the same picture!")
+        #print("~~~~~~~~~~~~~~~~~~~~~~They are the same picture!")
     else:
         return False
 
@@ -85,9 +93,10 @@ def skipjump_fame():
             print("caps failed")
             theframe = None
             time.sleep(1)
-        
+
+totalcars = 0        
 def gen_frames():  
-    global count, countdi, pb, theframe
+    global count, countdi, pb, pb1, pb2, theframe, totalcars
     print("framed")
     while  not thread_stop_event2.isSet():
         if theframe is None:
@@ -124,20 +133,36 @@ def gen_frames():
         if len(indexes) > 0 and isinstance(indexes, tuple):
             indexes = indexes[0]
         count =0
+        newcars = 0
         for i in indexes:
             i = i[0] if isinstance(i, tuple) else i
             x, y, w, h = boxes[i]
             label = str(classes[class_ids[i]])
             if label == "car":
-                if(len(pb)>0):
-                    for j in pb:
-                        if(they_are_the_same_picture(frame, j)):
-                            print("FFOumnd")
-                pb.append(frame)
+                thiscar = frame[y:y + h, x:x + w].copy()
+                if(True): #len(pb)>0):
+                    def is_in_pb1(im):
+                        for j in pb1:
+                            if(they_are_the_same_picture(thiscar, j)):
+                                return True
+                        return False
+                    def is_in_pb2(im):
+                        for j in pb2:
+                            if(they_are_the_same_picture(thiscar, j)):
+                                return True
+                        return False
+                    if(is_in_pb1(thiscar) or is_in_pb2(thiscar)):
+                        ...
+                    else:
+                        newcars=newcars+1
+                        totalcars = totalcars+1
+                pb.append(thiscar)
                 count = count+1
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 cv2.putText(frame, label, (x, y + 30), cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 2)
-                
+        if len(pb1)>0:
+            pb2 = pb1
+        pb1 = pb
         if(DEBUG_SHOW_SPOT):
             alpha = 0.75
             color=(125, 25, 125)
@@ -155,7 +180,7 @@ def gen_frames():
 
 
         ret, buffer = cv2.imencode('.png', frame)
-        socketio.emit('number', {'data': (bytearray([count]) + buffer.tobytes()).hex()})
+        socketio.emit('number', {'data': (bytearray([count]) +bytearray([newcars]) +bytearray([totalcars]) +  buffer.tobytes()).hex()})
 
 
 thread2 = Thread(target=gen_frames)

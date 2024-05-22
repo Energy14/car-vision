@@ -14,7 +14,12 @@ socket.on('number', function(msg) {
     const hexString = msg.data;
     var byteArray = new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
     document.getElementById('updCount').innerText = byteArray[0];
+    document.getElementById('diffCount').innerText = byteArray[1];
+    document.getElementById('totCount').innerText = byteArray[2];
+    
 
+    byteArray = byteArray.slice(1);
+    byteArray = byteArray.slice(1);
     byteArray = byteArray.slice(1);
     const blob = new Blob([byteArray], { type: 'image/png' });
 
@@ -31,6 +36,9 @@ socket.on('number', function(msg) {
 <body>
     <h1>Car Detection Live Stream</h1>
     <img id="thecam" src="" alt="Live stream">
-    <p>Car count:<span id="updCount">3</span></p>
+    <p>Car count:<span id="updCount">0</span></p>
+    <p>Difference:<span id="diffCount">0</span></p>
+    <p>Total cars:<span id="totCount">0</span></p>
+    
 </body>
 </html>
