@@ -6,7 +6,7 @@ ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
 RUN apk add --no-cache gcc musl-dev linux-headers curl bash  mesa-gl git
 SHELL ["/bin/bash", "-c"]
-RUN chmod +x /opt/conda/etc/profile.d/conda.sh && /bin/bash -c /opt/conda/etc/profile.d/conda.sh && /bin/bash -c conda activate base && \
+RUN chmod +x /opt/conda/etc/profile.d/conda.sh && /bin/bash -c /opt/conda/etc/profile.d/conda.sh && /bin/bash -c "conda init bash" && \
 #RUN echo ". ${HOME}/miniforge3/etc/profile.d/mamba.sh && mamba activate base" >> /etc/skel/.bashrc && \
 #echo ". ${HOME}/miniforge3/etc/profile.d/mamba.sh && mamba activate base" >> ~/.bashrc && \
 git clone https://github.com/Energy14/car-vision /code && \
@@ -14,13 +14,14 @@ git clone https://github.com/streamlink/streamlink.git /sl && \
 #curl -O https://github.com/patrick013/Object-Detection---Yolov3/raw/master/model/yolov3.weights?download= && \
 wget https://github.com/patrick013/Object-Detection---Yolov3/raw/master/model/yolov3.weights?download= && \
 mv yolov3.weights\?download= yolov3.weights && \
-/bin/bash -c pip install -r requirements.txt && \
-/bin/bash -c conda install -y opencv && \
-/bin/bash -c pip install /sl/ && \
-sed -i 's/^CAM2_MODE = [0-9]\+/CAM2_MODE = 1/' /code/app.py
+/bin/bash -c "pip install -r /code/requirements.txt" && \
+/bin/bash -c "conda install -y opencv" && \
+/bin/bash -c "pip install /sl/" && \
+sed -i 's/^CAM2_MODE = [0-9]\+/CAM2_MODE = 1/' /code/app.py && \
+chmod +x /code/run.sh
 
 EXPOSE 5000 
-CMD ["run.sh"] .
+CMD ["/code/run.sh"] .
 
 
 #sudo docker build .
